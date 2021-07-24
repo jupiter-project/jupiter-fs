@@ -3,6 +3,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0] - 2020-07-25
+### Added
+- Use jupiter-fs metadata subtype to filter all the metadata transactions
+
+### Changed
+- Update jupiter-node-sdk version to 0.4.0 increasing fee for binary transactions
+
 ## [0.1.1] - 2020-07-20
 ### Added
 - Update jupiter-node-sdk version supporting jupiter subtypes for metis

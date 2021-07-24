@@ -25,8 +25,8 @@ export default function JupiterFs({
   // Max lengh in Jupiter is 43008 bytes per encrypted message
   const CHUNK_SIZE_PATTERN = /.{1,40000}/g;
 
-  const TYPE_MESSAGING = 1;
-  const SUBTYPE_MESSAGING_METIS_DATA = 15;
+  const SUBTYPE_MESSAGING_METIS_DATA = 16;
+  const SUBTYPE_MESSAGING_METIS_METADATA = 17;
 
   return {
     key: `jupiter-fs`,
@@ -79,7 +79,7 @@ export default function JupiterFs({
           encryptSecret,
           feeNQT,
         }
-        await this.client.storeRecord(newAddyInfo, SUBTYPE_MESSAGING_METIS_DATA)
+        await this.client.storeRecord(newAddyInfo, SUBTYPE_MESSAGING_METIS_METADATA)
         addy = newAddyInfo
       }
       await this.checkAndFundAccount(addy.address)
@@ -115,7 +115,7 @@ export default function JupiterFs({
      */
     async getBinaryAddress() {
       // Get all the transactions for the main jupiter account
-      const allTxns = await this.client.getAllTransactions(true, TYPE_MESSAGING, SUBTYPE_MESSAGING_METIS_DATA)
+      const allTxns = await this.client.getAllMatadataTransactions()
       // for each transaction, check if contains the jupiter-fs metaDataKey and 
       // decrypt the chuncked transactions
       const binaryAccountInfo: any = (
@@ -149,7 +149,7 @@ export default function JupiterFs({
     },
 
     async ls() {
-      const allTxns = await this.client.getAllTransactions(true, TYPE_MESSAGING, SUBTYPE_MESSAGING_METIS_DATA)
+      const allTxns = await this.client.getAllMatadataTransactions()
       const allFilesObj: any = (
         await Promise.all(
           allTxns.map(async (txn: any) => {
@@ -221,12 +221,12 @@ export default function JupiterFs({
         txns: await this.client.encrypt(JSON.stringify(dataTxns)),
       }
 
-      await this.client.storeRecord(masterRecord, SUBTYPE_MESSAGING_METIS_DATA)
+      await this.client.storeRecord(masterRecord, SUBTYPE_MESSAGING_METIS_METADATA)
       return masterRecord
     },
 
     async deleteFile(id: string): Promise<boolean> {
-      await this.client.storeRecord({ id, isDeleted: true }, SUBTYPE_MESSAGING_METIS_DATA)
+      await this.client.storeRecord({ id, isDeleted: true }, SUBTYPE_MESSAGING_METIS_METADATA)
       return true
     },
 
@@ -252,7 +252,6 @@ export default function JupiterFs({
 
       if (!targetFile){
         // if not found, search in the confirmed transactions
-        txns = await this.binaryClient.getAllConfirmedTransactions(true, TYPE_MESSAGING, SUBTYPE_MESSAGING_METIS_DATA)
         const files = await this.ls()
         const targetFile = files.find(
           (t: any) => (id && id === t.id) || t.fileName === name

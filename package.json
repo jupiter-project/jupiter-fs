@@ -1,6 +1,6 @@
 {
   "name": "jupiter-fs",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A small file system implementation for the Jupiter blockchain.",
   "main": "./dist/JupiterFs.js",
   "repository": {
@@ -23,7 +23,7 @@
     "typescript": "^4.0.5"
   },
   "dependencies": {
-    "jupiter-node-sdk": "^0.3.1",
+    "jupiter-node-sdk": "^0.4.0",
     "uuid": "^8.3.2"
   },
   "keywords": [
