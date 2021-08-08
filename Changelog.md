@@ -3,6 +3,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.0] - 2020-08-08
+### Added
+- Added MAX_ALLOWED_SIZE validation, maximum as 3mb files
+- Calculate stimated fees and fuel the binary account before process the pieces
+
 ## [0.2.0] - 2020-07-25
 ### Added
 - Use jupiter-fs metadata subtype to filter all the metadata transactions
