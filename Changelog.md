@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.0] - 2020-09-02
+### Changed
+- Update transaction base fee
+
 ## [0.3.0] - 2020-08-08
 ### Added
 - Added MAX_ALLOWED_SIZE validation, maximum as 3mb files

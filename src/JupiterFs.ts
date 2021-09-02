@@ -16,10 +16,10 @@ export default function JupiterFs({
 }: any): any {
   // const jupServer = server || 'https://fs.jup.io'
   const jupServer = server || ''
-  feeNQT = feeNQT || 400
+  feeNQT = feeNQT || 5000
   // Quantity to found the binary client when doesnt have enought founds
-  minimumFndrAccountBalance = minimumFndrAccountBalance || 15000000 
-  minimumUserAccountBalance = minimumUserAccountBalance || 30000000
+  minimumFndrAccountBalance = minimumFndrAccountBalance || 300000000 
+  minimumUserAccountBalance = minimumUserAccountBalance || 500000000
 
   // Chunk size to split the file to upload
   // Max lengh in Jupiter is 43008 bytes per encrypted message
@@ -98,7 +98,7 @@ export default function JupiterFs({
       // Get balance for binary client
       const balanceJup = await this.client.getBalance(targetAddress)
       let remainingBalanceBI = new BigNumber(balanceJup.unconfirmedBalanceNQT).minus(minBalance)
-      
+
       if (
         // if binary client doesnt have money or is less than minimumFndrAccountBalance
         // then send money to support file upload 
