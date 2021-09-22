@@ -26,9 +26,9 @@ describe('JupiterFs', function() {
   })
 
   const testFilename = `${uuidv1()}.js`
-  const IMAGE_TO_TEST = 'big.jpg';
+  const IMAGE_TO_TEST = 'small.jpg';
 
- describe('#newBinaryAddress()', function() {
+  describe('#newBinaryAddress()', function() {
     it(`should get a new JUP address from a passphrase`, async () => {
       const info = await jupFs.newBinaryAddress()
       assert.strictEqual(info.address.slice(0, 4), 'JUP-')
@@ -55,7 +55,7 @@ describe('JupiterFs', function() {
         path.join(__dirname, '../testFiles/'+IMAGE_TO_TEST),
         { encoding: null }
       )
-      const res = await jupFs.writeFile(testFilename, fileData, function(errorr: any){
+      const res = await jupFs.writeFile(testFilename, fileData, "JUPITER", function(errorr: any){
         console.log("erorrrrrrrrrrrrr" + errorr)
       })
       assert.strictEqual(res.fileName, testFilename)
@@ -79,10 +79,10 @@ describe('JupiterFs', function() {
   describe('#writeFileSizeNotAllowed()', function() {
     it(`should write a file to a jupiter account with size not allowed`, async () => {
       const fileData = await fs.promises.readFile(
-        path.join(__dirname, '../testFiles/huge.jpg'),
+        path.join(__dirname, '../testFiles/1mb.jpg'),
         { encoding: null }
       )
-      const res = await jupFs.writeFile(testFilename, fileData, function(errorr: any){
+      const res = await jupFs.writeFile(testFilename, fileData, "JUPITER", function(errorr: any){
         assert.strictEqual(errorr.message, "File size not allowed")
       })
       assert.strictEqual(res === undefined, true)

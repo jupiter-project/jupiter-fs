@@ -4,6 +4,11 @@ import { Readable } from 'stream'
 import { v1 as uuidv1 } from 'uuid'
 import JupiterClient, { generatePassphrase } from 'jupiter-node-sdk'
 import zlib from 'zlib'
+import { create } from 'ipfs-http-client'
+import { concat } from 'uint8arrays/concat'
+import all from 'it-all'
+import { IPFSPath } from 'ipfs-core-types/src/utils'
+
 
 export default function JupiterFs({
   server,
@@ -12,10 +17,14 @@ export default function JupiterFs({
   encryptSecret,
   feeNQT,
   minimumFndrAccountBalance,
-  minimumUserAccountBalance
+  minimumUserAccountBalance,
+  dataPvider,
+  ipfsS
 }: any): any {
   // const jupServer = server || 'https://fs.jup.io'
   const jupServer = server || ''
+  const ipfsServer = ipfsS || 'https://ipfs.jup.io'
+
   feeNQT = feeNQT || 5000
   // Quantity to found the binary client when doesnt have enought founds
   minimumFndrAccountBalance = minimumFndrAccountBalance || 300000000 
@@ -24,10 +33,19 @@ export default function JupiterFs({
   // Chunk size to split the file to upload
   // Max lengh in Jupiter is 43008 bytes per encrypted message
   const CHUNK_SIZE_PATTERN = /.{1,40000}/g;
-  const MAX_ALLOWED_SIZE = 3 * 1024 * 1024;
+  const MAX_JUPITER_ALLOWED_SIZE = 1 * 1024 * 1024;
+  const MAX_IPFS_ALLOWED_SIZE = 100 * 1024 * 1024;
 
   const SUBTYPE_MESSAGING_METIS_DATA = 16;
   const SUBTYPE_MESSAGING_METIS_METADATA = 17;
+
+  const JUPITER_DATA_PROVIDER = "JUPITER";
+  const IPFS_DATA_PROVIDER = "IPFS";
+
+  //connect to ipfs node
+  const ipfsClient = create({
+    url: ipfsServer+'/api/v0'
+  })
 
   return {
     key: `jupiter-fs`,
@@ -41,6 +59,7 @@ export default function JupiterFs({
       minimumFndrAccountBalance,
       minimumUserAccountBalance
     }),
+    ipfsClient: ipfsClient,
     binaryClient: null,
 
     async getOrCreateBinaryAddress() {
@@ -194,10 +213,31 @@ export default function JupiterFs({
     async writeFile(
       name: string,
       data: Buffer,
+      dataProvider: string,
       errorCallback?: (err: Error) => {}
     ) {
 
-      if (data.length > MAX_ALLOWED_SIZE) {
+      if (dataProvider === undefined || typeof dataProvider === 'function'){
+        // define dataProvider base on size
+        if (data.length > MAX_JUPITER_ALLOWED_SIZE){
+          dataProvider = IPFS_DATA_PROVIDER
+        } else {
+          dataProvider = JUPITER_DATA_PROVIDER
+        }
+      }
+
+      if (dataProvider !== JUPITER_DATA_PROVIDER && 
+          dataProvider !== IPFS_DATA_PROVIDER) {
+          if (errorCallback){
+            errorCallback(new Error("Invalid Data Provider"));
+            return;
+          } else {
+            throw new Error("Invalid Data Provider");
+          }
+      }
+
+      if ((data.length > MAX_IPFS_ALLOWED_SIZE) ||
+          (dataProvider === JUPITER_DATA_PROVIDER && data.length > MAX_JUPITER_ALLOWED_SIZE)) {
         if (errorCallback){
           errorCallback(new Error("File size not allowed"));
           return;
@@ -206,12 +246,35 @@ export default function JupiterFs({
         }
       }
 
-      await this.getOrCreateBinaryAddress()    
+      await this.getOrCreateBinaryAddress()  
 
-      // compress the binary data before to convert to base64
-      const encodedFileData = zlib.deflateSync(Buffer.from(data)).toString('base64')
+      if (dataProvider === IPFS_DATA_PROVIDER){
+        return this.writeFileIntoIPFS(name, data)
+
+      } else {
+        // compress the binary data before to convert to base64
+        const encodedFileData = zlib.deflateSync(Buffer.from(data)).toString('base64')
+        return this.writeFileIntoJupiter(name, encodedFileData)
+
+      }
+    },
+
+    async writeFileIntoJupiter(
+      name: string,
+      encodedFileData: string,
+      errorCallback?: (err: Error) => {}
+    ) {
+    
+      let masterRecord = {
+        [this.key]: true,
+        id: uuidv1(),
+        fileName: name,
+        fileSize: encodedFileData.length,
+        txns: [],
+        dataProvider: JUPITER_DATA_PROVIDER
+      }
+
       const chunks = encodedFileData.match(CHUNK_SIZE_PATTERN)
-
       const expectedFees = this.binaryClient.calculateExpectedFees(chunks);
       await this.checkAndFundAccount(this.binaryClient.address, expectedFees)
       
@@ -228,15 +291,41 @@ export default function JupiterFs({
         })
       )
 
-      const masterRecord = {
+      masterRecord.txns = await this.client.encrypt(JSON.stringify(dataTxns))
+
+      await this.client.storeRecord(masterRecord, SUBTYPE_MESSAGING_METIS_METADATA)
+      return masterRecord
+    },
+
+    async writeFileIntoIPFS(
+      name: string,
+      data: Buffer,
+      errorCallback?: (err: Error) => {}
+    ) {
+      if(!ipfsClient) return {};
+      
+      const encodedEncryptedData = await this.client.encrypt(data)
+
+      //calculate base stimated fee 
+      //const expectedFees = constantFee + ((size / unitSize) * feePerSize);
+      const expectedFees = 7000 + ((encodedEncryptedData.length / 32) * 5000);
+      await this.checkAndFundAccount(this.binaryClient.address, expectedFees)
+
+      let masterRecord = {
         [this.key]: true,
         id: uuidv1(),
         fileName: name,
-        fileSize: data.length,
-        txns: await this.client.encrypt(JSON.stringify(dataTxns)),
+        fileSize: encodedEncryptedData.length,
+        cid: '',
+        dataProvider: IPFS_DATA_PROVIDER
       }
 
-      await this.client.storeRecord(masterRecord, SUBTYPE_MESSAGING_METIS_METADATA)
+      const response = await ipfsClient.add({
+        content: encodedEncryptedData
+      })
+      masterRecord.cid = await this.client.encrypt(response.cid.toString())
+
+      await this.client.storeRecord(masterRecord, SUBTYPE_MESSAGING_METIS_METADATA, expectedFees)
       return masterRecord
     },
 
@@ -253,9 +342,8 @@ export default function JupiterFs({
      * @returns Buffer of raw file data
      */
     async getFile(
-      { name, id }: any,
-      isReadStream: boolean = false
-    ): Promise<Buffer | Readable> {
+      { name, id }: any
+    ): Promise<Buffer> {
       await this.getOrCreateBinaryAddress()
 
       // search first in the unconfirmed transactions
@@ -274,10 +362,17 @@ export default function JupiterFs({
       }
 
       assert(targetFile, 'target file was not found')
-      
+
+      if (targetFile.dataProvider && targetFile.dataProvider === IPFS_DATA_PROVIDER){
+        return this.getFileFromIPFS(targetFile);
+      } else {
+        return this.getFileFromJupiter(targetFile);
+      }
+    },
+
+    async getFileFromJupiter( targetFile : any ): Promise<Buffer> {
       // decrypt the transactions info with the list of txIds where is stored the file
       const dataTxns = JSON.parse(await this.client.decrypt(targetFile.txns))
-      const readable = new Readable()
 
       /**
        * Get the base64 chunks of the image
@@ -323,15 +418,27 @@ export default function JupiterFs({
         return allBase64Strings
       }
 
-      if (isReadStream) {
-        readable._read = async () => {
-          await getBase64Strings(readable)
-        }
-        return readable
-      }
-
       const base64Strings = await getBase64Strings()
       return zlib.inflateSync(Buffer.from(base64Strings.join(''), 'base64'))
+    },
+
+
+    async getFileFromIPFS( targetFile : any ): Promise<Buffer> {
+      const cid = await this.client.decrypt(targetFile.cid);
+      
+      return await this.getFileFromIPFSAndCID(cid);
+    },
+
+    async getFileFromIPFSAndCID( CID: IPFSPath, encrypted?: boolean ): Promise<Buffer> {
+      if(!ipfsClient) return Buffer.alloc(0);
+
+      const fileDataFromIPFSEncrypted = concat(await all(ipfsClient.cat(CID)))
+      if (!fileDataFromIPFSEncrypted) return Buffer.alloc(0);
+
+      const fileDataFromIPFS = await this.client.decrypt(new TextDecoder().decode(fileDataFromIPFSEncrypted))
+      const buff = Buffer.from(fileDataFromIPFS, 'base64')
+
+      return buff;
     },
 
     async getFileStream({ name, id }: any): Promise<Readable> {

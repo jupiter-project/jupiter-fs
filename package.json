@@ -20,11 +20,13 @@
     "@types/uuid": "^8.3.0",
     "mocha": "^8.3.0",
     "ts-node": "^9.1.1",
-    "typescript": "^4.0.5"
+    "typescript": "^4.0.5",
+    "axios": "*"
   },
   "dependencies": {
     "jupiter-node-sdk": "^0.5.0",
-    "uuid": "^8.3.2"
+    "uuid": "^8.3.2",
+    "ipfs-http-client": "^0.21.4"
   },
   "keywords": [
     "blockchain",
