@@ -1,0 +1,9 @@
+export enum ErrorCode {
+    GENERAL = 3000,
+    AUTH = 3001,
+    PARAM_MISSING = 3002,
+    UNAUTHORIZED = 401,
+    NOT_FOUND = 404,
+    FORBIDDEN = 403,
+    INTERNAL_ERROR = 500
+}
